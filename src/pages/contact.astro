@@ -15,7 +15,6 @@ import { site } from "@lib/site";
           Chat on WhatsApp <span aria-hidden="true">↗</span>
         </a>
       </div>
-      <p class="contact-email-alternative">You can also email me at <a href={`mailto:${site.email}?subject=Project%20enquiry`}>{site.email}</a>.</p>
     </header>
   </section>
 </BaseLayout>
@@ -41,8 +40,6 @@ import { site } from "@lib/site";
   .whatsapp-cta { gap: 12px; padding: 18px 28px; min-height: 58px; background: #25d366; color: #08210f; border: 1px solid #1ea952; font-size: 1.05rem; box-shadow: 0 8px 24px rgba(18, 71, 36, .12); }
   .whatsapp-cta:hover { background: #20c35d; border-color: #16893f; }
   .whatsapp-cta svg { width: 24px; height: 24px; flex-shrink: 0; }
-  .contact-email-alternative { margin: 28px auto 0; font-size: 1rem; line-height: 1.7; text-align: center; }
-  .contact-email-alternative a { font-weight: 400; text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
   .contact-page a:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
   @media (max-width: 620px) {
     .contact-page { padding-top: 64px; padding-bottom: 64px; }
