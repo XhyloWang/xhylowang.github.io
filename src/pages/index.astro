@@ -1,0 +1,311 @@
+---
+import { getCollection } from "astro:content";
+import BaseLayout from "@layouts/BaseLayout.astro";
+import ContactSection from "@components/ContactSection.astro";
+import HomeServiceLinks from "@components/HomeServiceLinks.astro";
+import HomeSocialHighlights from "@components/HomeSocialHighlights.astro";
+import TestimonialsSection from "@components/TestimonialsSection.astro";
+import WorkGrid from "@components/WorkGrid.astro";
+import { entrySlug, published, rankPhotographyForAll, splitHidden } from "@lib/content";
+import type { PhotographyEntry } from "@lib/content";
+import { getGalleryCover, getGalleryImages, getHomePortraitCover, getMediumPortraitImages } from "@lib/gallery-images";
+import type { GalleryImage } from "@lib/gallery-images";
+import EventFilmFeature from "@components/EventFilmFeature.astro";
+import { featuredEventFilm, sections, site } from "@lib/site";
+
+const photos = published(await getCollection("photography"));
+const contentItems = published(await getCollection("content-work"));
+const allRankedPhotos = rankPhotographyForAll(photos);
+const homepageWorkItems = splitHidden(allRankedPhotos, 2);
+const socialHighlights = contentItems.filter((item) => item.data.contentType === "embed");
+
+const corporateCoverUrl = (photo: PhotographyEntry) =>
+  getGalleryCover(entrySlug(photo), photo.data.coverImage, photo.data.images, photo.data.coverImageIndex, "medium");
+
+// Carousel landscape sources: cover images in a curated order (up to 5).
+// TODO(xinhang): replace with Xinhang’s gallery slugs, in carousel order.
+const landscapeCoverSlugs = [
+  "placeholder-corporate-event",
+  "placeholder-stage-performance",
+  "placeholder-studio-portrait",
+  "placeholder-wedding-celebration"
+];
+const corporateCovers = landscapeCoverSlugs
+  .map((slug) => {
+    const photo = photos.find((candidate) => entrySlug(candidate) === slug);
+    return photo ? corporateCoverUrl(photo) : "";
+  })
+  .filter(Boolean);
+
+// TODO(xinhang): replace with the two galleries that feed the portrait carousel.
+const portraitSourceSlugs = [
+  "placeholder-corporate-event",
+  "placeholder-studio-portrait"
+];
+const walkingTourSlug = "placeholder-wedding-celebration";
+const walkingTourEntry = photos.find((candidate) => entrySlug(candidate) === walkingTourSlug);
+
+const portraitsBySource = new Map<string, GalleryImage[]>();
+for (const slug of portraitSourceSlugs) {
+  const entry = photos.find((candidate) => entrySlug(candidate) === slug);
+  portraitsBySource.set(slug, entry ? getMediumPortraitImages(slug, entry.data.images, 5) : []);
+}
+const portraitImages: GalleryImage[] = [];
+const portraitTarget = walkingTourEntry ? 4 : 5;
+const portraitRounds = Math.max(0, ...Array.from(portraitsBySource.values(), (images) => images.length));
+for (let index = 0; index < portraitRounds && portraitImages.length < portraitTarget; index += 1) {
+  for (const slug of portraitSourceSlugs) {
+    const image = portraitsBySource.get(slug)?.[index];
+    if (image) portraitImages.push(image);
+    if (portraitImages.length >= portraitTarget) break;
+  }
+}
+
+if (walkingTourEntry) {
+  const walkingTourImages = getGalleryImages(walkingTourSlug, walkingTourEntry.data.images);
+  const secondLast = walkingTourImages[walkingTourImages.length - 2];
+  if (secondLast) portraitImages.push(secondLast);
+}
+
+const carouselSlides = portraitImages.slice(0, 5).map((image, index) => ({
+  portrait: image.medium || image.large || image.thumb || "",
+  landscape: corporateCovers[index % corporateCovers.length] || image.medium || image.large || image.thumb || "",
+  alt: "Featured portfolio image"
+}));
+
+const visibleCoverPhoto = allRankedPhotos.find((photo) => !photo.data.hidden);
+const pageCover = visibleCoverPhoto
+  ? getHomePortraitCover(entrySlug(visibleCoverPhoto), visibleCoverPhoto.data.images)
+  : "";
+const ogImage = carouselSlides[0]?.portrait || pageCover;
+---
+
+<BaseLayout
+  active="home"
+  image={ogImage}
+  fullTitle={true}
+>
+  <section class="home-hero" aria-labelledby="hero-title">
+    <div class="home-hero-copy home-intro-grid">
+      <div class="home-name-block">
+        <h1 id="hero-title">Hi, I'm <span class="home-name-line">{site.name}.</span></h1>
+      </div>
+      <ul class="identity-list" aria-label="Short description">
+        <li>Event photographer</li>
+        <li>Event videographer</li>
+      </ul>
+      <div class="home-intro-block">
+        <p class="hero-lede">I’m a photographer and videographer based in Singapore, covering corporate events, private celebrations, and creative shoots.</p>
+        <div class="hero-actions">
+          <a class="button button-dark" href="#corporate-work">Explore my work</a>
+          <a class="button button-accent" href="/contact/">Contact me</a>
+        </div>
+      </div>
+      {
+        carouselSlides.length > 1 ? (
+          <figure class="home-portrait-card" data-home-carousel>
+            <div class="home-carousel-track">
+              {carouselSlides.map((slide, index) => (
+                <picture
+                  class:list={["home-carousel-slide", { "is-active": index === 0 }]}
+                  data-home-slide
+                  aria-hidden={index === 0 ? "false" : "true"}
+                >
+                  <source media="(max-width: 810px)" srcset={slide.landscape} />
+                  <img
+                    src={slide.portrait}
+                    alt={`${slide.alt} ${index + 1}`}
+                    loading={index === 0 ? "eager" : "lazy"}
+                    fetchpriority={index === 0 ? "high" : "auto"}
+                    decoding="async"
+                  />
+                </picture>
+              ))}
+            </div>
+            <div class="home-carousel-dots" role="tablist" aria-label="Featured portfolio images">
+              {carouselSlides.map((_, index) => (
+                <button
+                  class:list={["home-carousel-dot", { "is-active": index === 0 }]}
+                  type="button"
+                  role="tab"
+                  aria-label={`Featured image ${index + 1}`}
+                  aria-selected={index === 0 ? "true" : "false"}
+                  data-home-dot
+                />
+              ))}
+            </div>
+            <button class="home-carousel-arrow home-carousel-prev" type="button" aria-label="Previous image" data-home-prev>
+              <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                <path d="M15 5 8 12l7 7"></path>
+              </svg>
+            </button>
+            <button class="home-carousel-arrow home-carousel-next" type="button" aria-label="Next image" data-home-next>
+              <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                <path d="m9 5 7 7-7 7"></path>
+              </svg>
+            </button>
+          </figure>
+        ) : carouselSlides.length === 1 ? (
+          <figure class="home-portrait-card">
+            <img src={carouselSlides[0].portrait} alt={carouselSlides[0].alt} />
+          </figure>
+        ) : pageCover ? (
+          <figure class="home-portrait-card">
+            <img src={pageCover} alt="Featured portfolio image" />
+          </figure>
+        ) : null
+      }
+    </div>
+  </section>
+
+  <HomeServiceLinks />
+
+  {
+    sections.photography && (
+      <section id="corporate-work" class="home-section corporate-work" aria-labelledby="corporate-work-title">
+        <div class="home-section-heading">
+          <p class="eyebrow">Photography</p>
+          <div>
+            <h2 id="corporate-work-title">Events and celebrations</h2>
+            <p>Event photography for conferences, corporate gatherings, and private celebrations. View selected coverage below.</p>
+          </div>
+        </div>
+        <WorkGrid items={homepageWorkItems} />
+        <div class="home-section-footer">
+          <a class="button button-dark" href="/photography/">View all galleries</a>
+        </div>
+      </section>
+    )
+  }
+
+  {sections.video && (
+    <section id="event-video" class="home-section home-event-film" aria-labelledby="home-event-film-title">
+      <EventFilmFeature {...featuredEventFilm} id="home-event-film-title" loading="lazy" exploreUrl="/videography/" />
+    </section>
+  )}
+
+  {sections.content && <HomeSocialHighlights items={socialHighlights} />}
+
+  <TestimonialsSection showRule={false} showCta={false} />
+
+  <ContactSection />
+
+
+  <script>
+    const carousel = document.querySelector<HTMLElement>("[data-home-carousel]");
+
+    if (carousel) {
+      const slides = Array.from(carousel.querySelectorAll<HTMLElement>("[data-home-slide]"));
+      const dots = Array.from(carousel.querySelectorAll<HTMLElement>("[data-home-dot]"));
+      const track = carousel.querySelector<HTMLElement>(".home-carousel-track");
+      const prevButton = carousel.querySelector<HTMLElement>("[data-home-prev]");
+      const nextButton = carousel.querySelector<HTMLElement>("[data-home-next]");
+      let current = 0;
+      let timer: number | undefined;
+      let swipeStartX: number | null = null;
+      let swipeStartY: number | null = null;
+      let wheelDeltaX = 0;
+      let wheelGesture = 0;
+      let wheelNavigated = false;
+
+      function goTo(index: number) {
+        current = (index + slides.length) % slides.length;
+        slides.forEach((slide, i) => {
+          slide.classList.toggle("is-active", i === current);
+          slide.setAttribute("aria-hidden", String(i !== current));
+        });
+        dots.forEach((dot, i) => {
+          dot.classList.toggle("is-active", i === current);
+          dot.setAttribute("aria-selected", String(i === current));
+        });
+      }
+
+      function advance(offset: number) {
+        goTo(current + offset);
+        start();
+      }
+
+      function start() {
+        stop();
+        if (slides.length > 1) timer = window.setInterval(() => goTo(current + 1), 5000);
+      }
+
+      function stop() {
+        if (timer !== undefined) window.clearInterval(timer);
+        timer = undefined;
+      }
+
+      dots.forEach((dot, i) => {
+        dot.addEventListener("click", () => {
+          goTo(i);
+          start();
+        });
+      });
+
+      prevButton?.addEventListener("click", () => advance(-1));
+      nextButton?.addEventListener("click", () => advance(1));
+
+      track?.addEventListener("pointerdown", (event) => {
+        swipeStartX = event.clientX;
+        swipeStartY = event.clientY;
+        track.setPointerCapture(event.pointerId);
+      });
+
+      track?.addEventListener("pointerup", (event) => {
+        if (swipeStartX === null || swipeStartY === null) return;
+        const deltaX = event.clientX - swipeStartX;
+        const deltaY = event.clientY - swipeStartY;
+        swipeStartX = null;
+        swipeStartY = null;
+        if (Math.abs(deltaX) < 40 || Math.abs(deltaX) < Math.abs(deltaY)) return;
+        advance(deltaX < 0 ? 1 : -1);
+      });
+
+      track?.addEventListener("pointercancel", () => {
+        swipeStartX = null;
+        swipeStartY = null;
+      });
+
+      // Touchpad two-finger horizontal swipes arrive as `wheel` events with a
+      // dominant deltaX. Vertical scroll is left untouched so the page scrolls
+      // normally. One swipe gesture navigates exactly one slide: horizontal
+      // events spaced less than 300ms apart belong to the same gesture, and a
+      // gesture navigates at most once.
+      track?.addEventListener(
+        "wheel",
+        (event) => {
+          if (Math.abs(event.deltaY) >= Math.abs(event.deltaX)) {
+            wheelDeltaX = 0;
+            return;
+          }
+          event.preventDefault();
+
+          const now = Date.now();
+          if (now - wheelGesture > 300) {
+            wheelDeltaX = 0;
+            wheelNavigated = false;
+          }
+          wheelGesture = now;
+          wheelDeltaX += event.deltaX;
+
+          if (Math.abs(wheelDeltaX) < 40 || wheelNavigated) return;
+          wheelNavigated = true;
+          advance(wheelDeltaX < 0 ? 1 : -1);
+        },
+        { passive: false }
+      );
+
+      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        carousel.addEventListener("mouseenter", stop);
+        carousel.addEventListener("mouseleave", start);
+        carousel.addEventListener("focusin", stop);
+        carousel.addEventListener("focusout", start);
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) stop();
+          else start();
+        });
+        start();
+      }
+    }
+  </script>
+</BaseLayout>

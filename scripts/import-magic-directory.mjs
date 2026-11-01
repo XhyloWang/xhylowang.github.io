@@ -1,0 +1,501 @@
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { createInterface } from "node:readline/promises";
+import { stdin as input, stdout as output } from "node:process";
+import { fileURLToPath } from "node:url";
+import matter from "gray-matter";
+import sharp from "sharp";
+import YAML from "yaml";
+
+// Must be set before the first threadpool-consuming call (any fs/sharp async op below).
+// One thread per image, and let libuv run as many images at once as there are cores,
+// instead of one image hogging multiple threads via sharp's own thread pool.
+const cpuCount = os.availableParallelism();
+process.env.UV_THREADPOOL_SIZE = String(cpuCount);
+sharp.concurrency(1);
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const inboxRoot = path.join(root, "inbox", "galleries");
+const contentRoot = path.join(root, "src", "content", "photography");
+const outputRoot = path.join(root, "public", "images", "galleries");
+const supportedExtensions = new Set([".jpg", ".jpeg", ".png", ".webp"]);
+let promptInterface;
+
+const thumbLongEdge = 480;
+const mediumLongEdge = 1152;
+const largeLongEdge = 2550;
+const largeQuality = 75;
+const thumbMaxBytes = 600 * 1024;
+const largeMaxBytes = 550 * 1024;
+const mediumMaxBytes = 130 * 1024;
+const minQuality = 40;
+const qualityStep = 5;
+
+function slugify(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+async function exists(filePath) {
+  try {
+    await stat(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function listGalleryFolders() {
+  if (!(await exists(inboxRoot))) {
+    await mkdir(inboxRoot, { recursive: true });
+    return [];
+  }
+  const entries = await readdir(inboxRoot, { withFileTypes: true });
+  return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+}
+
+async function listSourceImages(folderPath) {
+  const entries = await readdir(folderPath, { withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isFile() && supportedExtensions.has(path.extname(entry.name).toLowerCase()))
+    .map((entry) => entry.name)
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+}
+
+async function readGalleryMarkdown(folderPath) {
+  const galleryMdPath = path.join(folderPath, "gallery.md");
+  if (!(await exists(galleryMdPath))) {
+    return promptForGalleryMarkdown(folderPath, galleryMdPath, matter("---\n---\n"), {
+      reason: "No gallery.md found, so let's create one."
+    });
+  }
+
+  const parsed = matter(await readFile(galleryMdPath, "utf8"));
+  if (String(parsed.data?.guidedContext || "").trim().length < 100) {
+    return promptForGalleryMarkdown(folderPath, galleryMdPath, parsed, {
+      reason: "gallery.md needs a guidedContext of at least 100 characters."
+    });
+  }
+
+  if (!hasRank(parsed.data?.featuredRank)) {
+    return promptForGalleryMarkdown(folderPath, galleryMdPath, parsed, {
+      reason: "gallery.md exists, but it has no featuredRank."
+    });
+  }
+
+  if (!hasRank(parsed.data?.categoryRank)) {
+    return promptForGalleryMarkdown(folderPath, galleryMdPath, parsed, {
+      reason: "gallery.md exists, but it has no categoryRank."
+    });
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(parsed.data || {}, "coverImageIndex")) {
+    return promptForGalleryMarkdown(folderPath, galleryMdPath, parsed, {
+      reason: "gallery.md exists, but it has no coverImageIndex."
+    });
+  }
+
+  return parsed;
+}
+
+async function promptForGalleryMarkdown(folderPath, galleryMdPath, parsed, { reason }) {
+  const folderName = path.basename(folderPath);
+  const existingData = parsed.data || {};
+  const hasCoverImageIndex = Object.prototype.hasOwnProperty.call(existingData, "coverImageIndex");
+  const hasRequiredMetadata =
+    String(existingData.guidedContext || "").trim().length >= 100 &&
+    hasRank(existingData.featuredRank) &&
+    hasRank(existingData.categoryRank);
+  const defaultCoverImageIndex = hasCoverImageIndex
+    ? existingData.coverImageIndex
+    : await getExistingCoverImageIndex(folderName);
+
+  if (!input.isTTY || !output.isTTY) {
+    const galleryExists = await exists(galleryMdPath);
+    const data = cleanFrontmatter({
+      ...existingData,
+      coverImageIndex: defaultCoverImageIndex
+    });
+    const yaml = YAML.stringify(data).trim();
+    const raw = `---\n${yaml}\n---\n\n${parsed.content.trim()}\n`;
+
+    if (!hasCoverImageIndex && galleryExists) {
+      await writeFile(galleryMdPath, raw);
+      console.log(`Added coverImageIndex: ${defaultCoverImageIndex} to ${path.relative(root, galleryMdPath)}\n`);
+    }
+
+    if (hasRequiredMetadata) {
+      return hasCoverImageIndex ? parsed : matter(raw);
+    }
+
+    throw new Error(
+      [
+        `Gallery "${folderName}" needs mandatory metadata before import.`,
+        reason,
+        "Run `npm run import:magic` locally in an interactive terminal so the importer can ask for details,",
+        "or edit gallery.md manually with at least:",
+        "---",
+        "guidedContext: At least 100 characters describing the event and the details to highlight.",
+        "featuredRank: 10",
+        "categoryRank: 10",
+        "coverImageIndex: 1",
+        "---"
+      ].join("\n")
+    );
+  }
+
+  const prompt = getPromptInterface();
+  console.log(`\nNew gallery detected: ${folderName}`);
+  console.log(reason);
+
+  let title = String(existingData.title || "").trim();
+  if (!title && !String(existingData.generatedTitle || "").trim()) {
+    title = (await prompt.question("Title (optional, press Enter to let AI generate one): ")).trim();
+  }
+
+  let guidedContext = String(existingData.guidedContext || "").trim();
+
+  while (guidedContext.length < 100) {
+    guidedContext = (await prompt.question("Context (mandatory, at least 100 characters, used for AI title/description): ")).trim();
+    if (guidedContext.length < 100) {
+      console.log("Context must be at least 100 characters. Add useful facts, the angle, client value, event type, or moments to highlight.");
+    }
+  }
+
+  console.log("Rank reminder: lower numbers appear first. Use 1 for top-tier highlights; press Enter for 10, the lowest-priority default.");
+  const featuredRank = await promptForRank("Featured rank for the All view", existingData.featuredRank);
+  const categoryRank = await promptForRank("Category rank for this tab", existingData.categoryRank);
+  const coverImageIndex = hasCoverImageIndex
+    ? existingData.coverImageIndex
+    : await promptForCoverImageIndex(folderPath, defaultCoverImageIndex);
+
+  const data = cleanFrontmatter({
+    ...existingData,
+    title: title || existingData.title || undefined,
+    photographyType: existingData.photographyType || "corporate-private-events",
+    publishStatus: existingData.publishStatus || "published",
+    guidedContext,
+    featuredRank,
+    categoryRank,
+    coverImageIndex
+  });
+  const yaml = YAML.stringify(data).trim();
+  const raw = `---\n${yaml}\n---\n\n${parsed.content.trim()}\n`;
+  await writeFile(galleryMdPath, raw);
+  console.log(`Updated ${path.relative(root, galleryMdPath)}\n`);
+
+  return matter(raw);
+}
+
+async function getExistingCoverImageIndex(folderName) {
+  const slug = slugify(folderName);
+  const existing = await readExistingContent(path.join(contentRoot, `${slug}.md`));
+  const index = Number(existing.data.coverImageIndex);
+  return Number.isInteger(index) && index !== 0 ? index : 1;
+}
+
+async function promptForCoverImageIndex(folderPath, defaultIndex) {
+  const images = await listSourceImages(folderPath);
+  const imageCount = images.length;
+  console.log("Cover images are numbered in natural filename order:");
+  images.forEach((name, index) => console.log(`  ${index + 1}: ${name}`));
+  const range = imageCount ? `1-${imageCount}` : "1 or higher";
+  const defaultCoverIndex =
+    Number.isInteger(defaultIndex) && defaultIndex !== 0 && (!imageCount || Math.abs(defaultIndex) <= imageCount)
+      ? defaultIndex
+      : 1;
+  const prompt = getPromptInterface();
+
+  while (true) {
+    const answer = (await prompt.question(`Cover image index (1-based or negative from end, ${range}; press Enter for ${defaultCoverIndex}): `)).trim();
+    if (!answer) return defaultCoverIndex;
+
+    const index = Number(answer);
+    if (Number.isInteger(index) && index !== 0 && (!imageCount || Math.abs(index) <= imageCount)) return index;
+
+    console.log(`Enter a nonzero whole number within ${imageCount || "the number of source images"}, or press Enter for ${defaultCoverIndex}.`);
+  }
+}
+
+function getPromptInterface() {
+  if (!promptInterface) {
+    promptInterface = createInterface({ input, output });
+  }
+  return promptInterface;
+}
+
+function hasRank(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0;
+}
+
+async function promptForRank(label, existingValue) {
+  if (hasRank(existingValue)) {
+    return Number(existingValue);
+  }
+
+  const prompt = getPromptInterface();
+  const answer = (await prompt.question(`${label} (lower appears first, blank = 10): `)).trim();
+  const number = Number(answer);
+
+  if (!answer) return 10;
+  if (Number.isFinite(number) && number > 0) return number;
+
+  console.log(`Invalid rank "${answer}". Using 10 as the lowest-priority default.`);
+  return 10;
+}
+
+async function readManifest(manifestPath) {
+  try {
+    return JSON.parse(await readFile(manifestPath, "utf8"));
+  } catch {
+    return { sourceFiles: [] };
+  }
+}
+
+async function encodeWebp(inputPath, longEdge, quality, forThumb = false, options = {}) {
+  const maxBytes = options.maxBytes ?? thumbMaxBytes;
+  const effort = options.effort ?? 4;
+  let pipeline = sharp(inputPath).rotate().toColorspace("srgb");
+
+  // Thumb-only: denoise before the resize so sensor noise doesn't alias into
+  // visible speckling once decimated down to 480px, then sharpen after the
+  // resize to restore the edge contrast the downscale softened. Large images
+  // keep enough real detail that neither step is needed.
+  if (forThumb) {
+    pipeline = pipeline.median(3);
+  }
+
+  pipeline = pipeline.resize({
+    width: longEdge,
+    height: longEdge,
+    fit: "inside",
+    withoutEnlargement: true
+  });
+
+  if (forThumb) {
+    pipeline = pipeline.sharpen();
+  }
+
+  const result = await pipeline.webp({ quality, preset: "photo", effort, smartSubsample: true }).toBuffer({ resolveWithObject: true });
+
+  if (result.data.length > maxBytes && quality > minQuality) {
+    return encodeWebp(inputPath, longEdge, Math.max(minQuality, quality - qualityStep), forThumb, options);
+  }
+
+  return result;
+}
+
+async function writeWebp(inputPath, outputPath, longEdge, quality, forThumb = false, options = {}) {
+  const result = await encodeWebp(inputPath, longEdge, quality, forThumb, options);
+  await writeFile(outputPath, result.data);
+  return result.info;
+}
+
+async function processGallery({ folderName, folderPath }) {
+  const slug = slugify(folderName);
+  if (!slug) {
+    console.warn(`Skipping "${folderName}" because it cannot be slugified.`);
+    return;
+  }
+
+  const sourceImages = await listSourceImages(folderPath);
+  if (sourceImages.length === 0) {
+    console.warn(`Skipping "${folderName}" because it has no supported images.`);
+    return;
+  }
+
+  const outputDir = path.join(outputRoot, slug);
+  const manifestPath = path.join(outputDir, "manifest.json");
+  const oldManifest = await readManifest(manifestPath);
+  const oldByName = new Map((oldManifest.sourceFiles || []).map((file) => [file.name, file]));
+  const newManifest = {
+    generatedAt: new Date().toISOString(),
+    sourceFiles: []
+  };
+
+  await mkdir(outputDir, { recursive: true });
+
+  // Which images get a medium derivative: the gallery cover (via
+  // coverImageIndex) plus any indices listed in gallery.md `mediumImages`.
+  const galleryMd = await readGalleryMarkdown(folderPath);
+  const galleryData = galleryMd.data || {};
+  const existingContent = await readExistingContent(path.join(contentRoot, `${slug}.md`));
+  const coverIndex = Number(galleryData.coverImageIndex ?? existingContent.data.coverImageIndex ?? 1);
+  const mediumImages = Array.isArray(galleryData.mediumImages) ? galleryData.mediumImages.map(Number) : [];
+  const resolvedCoverIndex = coverIndex < 0 ? sourceImages.length + coverIndex + 1 : coverIndex;
+  const mediumSet = new Set([resolvedCoverIndex, ...mediumImages].filter((n) => Number.isInteger(n) && n >= 1));
+
+  // Pass 1: cheap sequential fs/cache-identity checks only, no encoding yet.
+  const records = [];
+  for (const [index, sourceName] of sourceImages.entries()) {
+    const sourcePath = path.join(folderPath, sourceName);
+    const sourceStat = await stat(sourcePath);
+    const number = String(index + 1).padStart(3, "0");
+    const outputThumb = `image-${number}-thumb.webp`;
+    const outputLarge = `image-${number}-large.webp`;
+    const outputMedium = mediumSet.has(index + 1) ? `image-${number}-medium.webp` : undefined;
+    const thumbPath = path.join(outputDir, outputThumb);
+    const largePath = path.join(outputDir, outputLarge);
+    const mediumPath = outputMedium ? path.join(outputDir, outputMedium) : undefined;
+    const existing = oldByName.get(sourceName);
+
+    const width = existing?.width;
+    const height = existing?.height;
+    const aspectRatio = existing?.aspectRatio;
+    const canReuse =
+      existing &&
+      existing.size === sourceStat.size &&
+      existing.mtimeMs === sourceStat.mtimeMs &&
+      existing.outputThumb === outputThumb &&
+      existing.outputLarge === outputLarge &&
+      (await exists(thumbPath)) &&
+      (await exists(largePath)) &&
+      width &&
+      height;
+    const canReuseMedium =
+      Boolean(outputMedium) &&
+      canReuse &&
+      existing?.outputMedium === outputMedium &&
+      (await exists(mediumPath));
+
+    records.push({ sourceName, sourcePath, sourceStat, outputThumb, outputLarge, outputMedium, thumbPath, largePath, mediumPath, canReuse, canReuseMedium, width, height, aspectRatio });
+  }
+
+  // Pass 2: encode everything that needs it, thumbs first (they finish fastest)
+  // then larges, then mediums, each phase as one Promise.all —
+  // UV_THREADPOOL_SIZE (cpuCount) already bounds how many run natively at once.
+  const needsEncode = records.filter((record) => !record.canReuse);
+  await Promise.all(needsEncode.map((record) => writeWebp(record.sourcePath, record.thumbPath, thumbLongEdge, 65, true)));
+  const largeResults = await Promise.all(needsEncode.map((record) =>
+    writeWebp(record.sourcePath, record.largePath, largeLongEdge, largeQuality, false, { maxBytes: largeMaxBytes })
+  ));
+  needsEncode.forEach((record, index) => {
+    const large = largeResults[index];
+    record.width = large.width;
+    record.height = large.height;
+    record.aspectRatio = Number((large.width / large.height).toFixed(4));
+  });
+  const needsMediumEncode = records.filter((record) => record.outputMedium && !record.canReuseMedium);
+  await Promise.all(needsMediumEncode.map((record) =>
+    writeWebp(record.sourcePath, record.mediumPath, mediumLongEdge, 80, false, { maxBytes: mediumMaxBytes, effort: 6 })
+  ));
+
+  for (const record of records) {
+    const entry = {
+      name: record.sourceName,
+      mtimeMs: record.sourceStat.mtimeMs,
+      size: record.sourceStat.size,
+      outputThumb: record.outputThumb,
+      outputLarge: record.outputLarge,
+      width: record.width,
+      height: record.height,
+      aspectRatio: record.aspectRatio
+    };
+    if (record.outputMedium) entry.outputMedium = record.outputMedium;
+    newManifest.sourceFiles.push(entry);
+  }
+
+  await removeStaleOutputs(outputDir, newManifest);
+  await writeFile(manifestPath, `${JSON.stringify(newManifest, null, 2)}\n`);
+  await writeGalleryContent({ folderPath, slug, manifest: newManifest });
+  console.log(`Imported ${sourceImages.length} image(s): ${slug}`);
+}
+
+async function removeStaleOutputs(outputDir, manifest) {
+  const keep = new Set(["manifest.json"]);
+  for (const file of manifest.sourceFiles) {
+    keep.add(file.outputThumb);
+    keep.add(file.outputLarge);
+    if (file.outputMedium) keep.add(file.outputMedium);
+  }
+
+  const entries = await readdir(outputDir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    if (!entry.name.endsWith(".webp")) continue;
+    if (!keep.has(entry.name)) {
+      await rm(path.join(outputDir, entry.name), { force: true });
+    }
+  }
+}
+
+async function writeGalleryContent({ folderPath, slug, manifest }) {
+  const parsed = await readGalleryMarkdown(folderPath);
+  const data = parsed.data || {};
+  const contentPath = path.join(contentRoot, `${slug}.md`);
+  const existing = await readExistingContent(contentPath);
+  const existingDate = existing.data.date instanceof Date
+    ? existing.data.date.toISOString().slice(0, 10)
+    : existing.data.date;
+  const first = manifest.sourceFiles[0];
+  const coverImageIndex = Number(data.coverImageIndex ?? existing.data.coverImageIndex);
+  const coverBySelectedIndex =
+    Number.isInteger(coverImageIndex) && coverImageIndex !== 0 && Math.abs(coverImageIndex) <= manifest.sourceFiles.length
+      ? manifest.sourceFiles[coverImageIndex < 0 ? manifest.sourceFiles.length + coverImageIndex : coverImageIndex - 1]
+      : undefined;
+  const cover = coverBySelectedIndex || first;
+
+  const frontmatter = cleanFrontmatter({
+    title: data.title || undefined,
+    generatedTitle: data.generatedTitle || existing.data.generatedTitle || undefined,
+    date: data.date || existingDate || new Date().toISOString().slice(0, 10),
+    photographyType: data.photographyType || "corporate-private-events",
+    client: data.client || undefined,
+    featuredRank: hasRank(data.featuredRank) ? Number(data.featuredRank) : 10,
+    categoryRank: hasRank(data.categoryRank) ? Number(data.categoryRank) : 10,
+    hidden: data.hidden === true || data.hidden === "true" ? true : undefined,
+    publishStatus: data.publishStatus || "published",
+    coverImageIndex: coverBySelectedIndex ? coverImageIndex : undefined,
+    summary: data.summary || existing.data.summary || undefined,
+    cardSummary: data.cardSummary || existing.data.cardSummary || undefined,
+    description: data.description || undefined,
+    guidedContext: data.guidedContext || undefined,
+    platformCaption: data.platformCaption || undefined,
+    autoSummary: data.autoSummary === false || data.autoSummary === "false" ? false : undefined,
+    services: Array.isArray(data.services) ? data.services : undefined,
+    tags: Array.isArray(data.tags) ? data.tags : undefined,
+    googlePhotosUrl: data.googlePhotosUrl || undefined,
+    coverImage: data.coverImage || (cover ? `/images/galleries/${slug}/${cover.outputLarge}` : undefined)
+  });
+
+  await mkdir(contentRoot, { recursive: true });
+  const yaml = YAML.stringify(frontmatter).trim();
+  const body = parsed.content.trim() || existing.content.trim();
+  await writeFile(
+    contentPath,
+    `---\n# photographyType choices: corporate-private-events | stage-work | photoshoot | wedding-rom\n# hidden: true keeps this gallery out of home/photography listings unless ?hidden=1 is in the URL\n# coverImageIndex: N picks the Nth image (1-based); negative values count from the end as the cover instead of the first\n${yaml}\n---\n\n${body}\n`
+  );
+}
+
+async function readExistingContent(contentPath) {
+  try {
+    return matter(await readFile(contentPath, "utf8"));
+  } catch {
+    return { data: {}, content: "" };
+  }
+}
+
+function cleanFrontmatter(frontmatter) {
+  return Object.fromEntries(Object.entries(frontmatter).filter(([, value]) => value !== undefined && value !== ""));
+}
+
+const folders = await listGalleryFolders();
+if (folders.length === 0) {
+  console.log("No magic-directory galleries found in inbox/galleries.");
+}
+
+for (const folderName of folders) {
+  await processGallery({
+    folderName,
+    folderPath: path.join(inboxRoot, folderName)
+  });
+}
+
+if (promptInterface) {
+  promptInterface.close();
+}

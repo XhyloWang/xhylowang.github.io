@@ -1,0 +1,26 @@
+---
+import type { PhotographyEntry } from "@lib/content";
+import { displayTitle, entrySlug, galleryUrl, photographyTypeLabel } from "@lib/content";
+import { getGalleryCover } from "@lib/gallery-images";
+
+interface Props {
+  item: PhotographyEntry;
+  large?: boolean;
+}
+
+const { item, large = false } = Astro.props;
+const slug = entrySlug(item);
+const cover = getGalleryCover(slug, item.data.coverImage, item.data.images, item.data.coverImageIndex, "medium");
+const title = displayTitle(item);
+const category = photographyTypeLabel(item);
+---
+
+<a class:list={["work-card", { "large-work-card": large, "hidden-gallery-card": item.data.hidden }]} href={galleryUrl(item)}>
+  <span class="curation-rank-badge" aria-hidden="true">F{item.data.featuredRank} · C{item.data.categoryRank}</span>
+  {cover && <img src={cover} alt={title} loading="lazy" />}
+  <div>
+    <span class="meta-label">{category}</span>
+    <strong>{title}</strong>
+    <p class="card-summary">{item.data.cardSummary || item.data.summary || item.data.description || "A set of highlights from this shoot."}</p>
+  </div>
+</a>

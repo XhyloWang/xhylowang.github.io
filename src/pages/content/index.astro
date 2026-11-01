@@ -1,0 +1,68 @@
+---
+import { getCollection, render } from "astro:content";
+import BaseLayout from "@layouts/BaseLayout.astro";
+import ContentEmbedGrid from "@components/ContentEmbedGrid.astro";
+import FeaturedCaseStudy from "@components/FeaturedCaseStudy.astro";
+import TestimonialsSection from "@components/TestimonialsSection.astro";
+import WhatToExpectSection from "@components/WhatToExpectSection.astro";
+import ContactSection from "@components/ContactSection.astro";
+import { published } from "@lib/content";
+import { pricing, sections } from "@lib/site";
+
+const contentRows = [
+  {
+    label: "Pricing",
+    value: [
+      `Single pieces: From $${pricing.content.single}.`,
+      `Campaign packages: From $${pricing.content.campaign} for multiple pieces for a launch or promotion.`,
+      `Ongoing partnerships: From $${pricing.content.retainer.toLocaleString("en-SG")} per month.`
+    ]
+  },
+  { label: "Monthly scope", value: "A typical monthly scope covers up to 4 pieces across Instagram, TikTok, or LinkedIn, with 1 round of revisions per piece." },
+  { label: "Turnaround", value: ["A single video is delivered within 3 business days of filming.", "Delivery within 1 business day or on the same day may be available by arrangement. Let’s discuss what you need before booking."] },
+  { label: "Commitment", value: "Ongoing partnerships run month-to-month, with no lock-in contract." }
+];
+
+const contentItems = published(await getCollection("content-work"));
+const embedItems = contentItems.filter((item) => item.data.contentType === "embed");
+const caseStudies = contentItems.filter((item) => item.data.contentType === "case-study");
+const featuredCaseStudy = sections.caseStudy ? caseStudies.find((item) => item.data.featured) || caseStudies[0] : undefined;
+const renderedCaseStudy = featuredCaseStudy ? await render(featuredCaseStudy) : undefined;
+const CaseStudyBody = renderedCaseStudy?.Content;
+const pageCover = featuredCaseStudy?.data.coverImage || embedItems.find((item) => item.data.coverImage)?.data.coverImage;
+---
+
+<BaseLayout title="Social media" description="Instagram and TikTok-ready social media content for brands, small businesses, and the events that matter to them." active="content" image={pageCover}>
+  <section class="page-hero content-page-hero" aria-labelledby="content-title">
+    <p class="eyebrow">Social media</p>
+    <h1 id="content-title">Reels for businesses and creators</h1>
+    <p>Selected videos for Instagram and TikTok, including education, lifestyle, and property content.</p>
+  </section>
+
+  <ContentEmbedGrid items={embedItems} />
+
+  {
+    featuredCaseStudy && CaseStudyBody && (
+      <FeaturedCaseStudy item={featuredCaseStudy}>
+        <CaseStudyBody />
+      </FeaturedCaseStudy>
+    )
+  }
+
+  <TestimonialsSection showCta={false} />
+  <WhatToExpectSection
+    id="what-to-expect"
+    rows={contentRows}
+    heading="Packages and turnaround"
+    intro="Start with one video, plan a campaign, or arrange regular content shoots."
+  />
+
+  <ContactSection />
+
+</BaseLayout>
+
+<style>
+  :global(#what-to-expect-title) {
+    letter-spacing: -0.01em;
+  }
+</style>

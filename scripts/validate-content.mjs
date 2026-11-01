@@ -1,0 +1,242 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { access, readdir, readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import matter from "gray-matter";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const publicDir = path.join(root, "public");
+const contentDir = path.join(root, "src", "content");
+const errors = [];
+const warnings = [];
+const allowedPhotographyTypes = ["corporate-private-events", "stage-work", "photoshoot", "wedding-rom"];
+const allowedContentTypes = ["embed", "case-study"];
+const allowedContentPlatforms = ["instagram", "tiktok", "linkedin"];
+const allowedSocialCategories = ["corporate", "lifestyle", "real-estate"];
+
+function fail(message) {
+  errors.push(message);
+}
+
+function warn(message) {
+  warnings.push(message);
+}
+
+async function existsPublic(publicPath) {
+  if (!publicPath || typeof publicPath !== "string") return false;
+  if (/^https?:\/\//.test(publicPath)) return true;
+  if (!publicPath.startsWith("/")) return false;
+  try {
+    await access(path.join(publicDir, publicPath.slice(1)));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function readContentFiles(collection, extensions) {
+  const dir = path.join(contentDir, collection);
+  const files = (await readdir(dir)).filter((file) => extensions.some((extension) => file.endsWith(extension))).sort();
+  return Promise.all(
+    files.map(async (file) => {
+      const fullPath = path.join(dir, file);
+      const parsed = matter(await readFile(fullPath, "utf8"));
+      return {
+        file,
+        slugFromFile: file.replace(/\.(md|mdx)$/, ""),
+        data: parsed.data,
+        body: parsed.content.trim()
+      };
+    })
+  );
+}
+
+function imageCandidates(gallery) {
+  const frontmatterImages = Array.isArray(gallery.data.images)
+    ? gallery.data.images.filter((image) => image && typeof image === "object" && (image.thumb || image.large))
+    : [];
+  if (frontmatterImages.length > 0) return frontmatterImages;
+
+  const manifestImages = imageCandidatesFromManifest(gallery.slugFromFile);
+  if (manifestImages.length > 0) return manifestImages;
+
+  return imageCandidatesFromFolder(gallery.slugFromFile);
+}
+
+function imageCandidatesFromManifest(slug) {
+  try {
+    const manifestPath = path.join(publicDir, "images", "galleries", slug, "manifest.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    return (manifest.sourceFiles || [])
+      .map((file) => ({
+        thumb: file.outputThumb ? `/images/galleries/${slug}/${file.outputThumb}` : "",
+        large: file.outputLarge ? `/images/galleries/${slug}/${file.outputLarge}` : ""
+      }))
+      .filter((image) => image.thumb || image.large);
+  } catch {
+    return [];
+  }
+}
+
+function imageCandidatesFromFolder(slug) {
+  try {
+    const galleryDir = path.join(publicDir, "images", "galleries", slug);
+    const files = readdirSync(galleryDir).filter((file) => file.endsWith(".webp")).sort();
+    return files.map((file) => ({
+      thumb: `/images/galleries/${slug}/${file}`,
+      large: `/images/galleries/${slug}/${file}`
+    }));
+  } catch {
+    return [];
+  }
+}
+
+
+async function validatePhotography() {
+  const galleries = await readContentFiles("photography", [".md", ".mdx"]);
+  const seenFiles = new Set();
+
+  for (const gallery of galleries) {
+    if (seenFiles.has(gallery.slugFromFile)) warn(`Duplicate filename slug seen: ${gallery.slugFromFile}`);
+    seenFiles.add(gallery.slugFromFile);
+
+    if (!gallery.data.guidedContext) warn(`Photography gallery "${gallery.file}" has no guidedContext; AI title and summary generation will have little context.`);
+    if (gallery.data.cardSummary && !isValidCardSummary(gallery.data.cardSummary, gallery.data.title || gallery.data.generatedTitle)) {
+      warn(`Photography gallery "${gallery.file}" has a cardSummary outside the 6-15 word or title-distinctness limits.`);
+    }
+    if (gallery.data.slug && gallery.data.slug !== gallery.slugFromFile) {
+      warn(`Photography gallery "${gallery.file}" slug does not match filename; filename route will be used.`);
+    }
+    if (gallery.data.publishStatus && !["draft", "published", "archived"].includes(String(gallery.data.publishStatus))) {
+      warn(`Photography gallery "${gallery.file}" has invalid publishStatus; it will render as published.`);
+    }
+    if (gallery.data.photographyType && !allowedPhotographyTypes.includes(String(gallery.data.photographyType))) {
+      warn(`Photography gallery "${gallery.file}" has invalid photographyType; corporate-private-events fallback will be used.`);
+    }
+    if (!hasPositiveNumber(gallery.data.featuredRank)) {
+      warn(`Photography gallery "${gallery.file}" has no valid featuredRank; rank 10 fallback will be used.`);
+    }
+    if (!hasPositiveNumber(gallery.data.categoryRank)) {
+      warn(`Photography gallery "${gallery.file}" has no valid categoryRank; rank 10 fallback will be used.`);
+    }
+
+    const images = imageCandidates(gallery);
+    if (images.length === 0) {
+      fail(`Photography gallery "${gallery.file}" has no usable images. Add at least one image with thumb or large.`);
+      continue;
+    }
+
+    for (const [index, image] of images.entries()) {
+      const displayPath = image.large || image.thumb;
+      const thumbPath = image.thumb || image.large;
+      if (!(await existsPublic(displayPath))) {
+        warn(`Photography gallery "${gallery.file}" image ${index + 1} large path was not found: ${displayPath}`);
+      }
+      if (!(await existsPublic(thumbPath))) {
+        warn(`Photography gallery "${gallery.file}" image ${index + 1} thumb path was not found: ${thumbPath}`);
+      }
+    }
+  }
+}
+
+function hasPositiveNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0;
+}
+
+function isValidCardSummary(value, title = "") {
+  const summary = String(value || "").replace(/\s+/g, " ").trim();
+  const words = summary.split(/\s+/).filter(Boolean);
+  if (words.length < 6 || words.length > 15) return false;
+  if (/[/#*_`]|https?:\/\/|www\./i.test(summary) || /[\p{Extended_Pictographic}]/u.test(summary)) return false;
+  if (/\b(?:captured|documented|showcasing|featuring|highlighting)\s+(?:for|the|a|an)\b/i.test(summary)) return false;
+
+  const titleWords = normalizeForCardSummary(title).split(/\s+/).filter(Boolean);
+  const summaryWords = normalizeForCardSummary(summary).split(/\s+/).filter(Boolean);
+  const titleSet = new Set(titleWords);
+  const meaningfulSummaryWords = summaryWords.filter((word) => word.length > 2 && !cardSummaryStopWords.has(word));
+  const novelWords = meaningfulSummaryWords.filter((word) => !titleSet.has(word));
+  if (meaningfulSummaryWords.length > 0 && novelWords.length < 2) return false;
+
+  for (let index = 0; index <= summaryWords.length - 3; index += 1) {
+    const phrase = summaryWords.slice(index, index + 3).join(" ");
+    if (phrase && titleWords.join(" ").includes(phrase)) return false;
+  }
+
+  return true;
+}
+
+function normalizeForCardSummary(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const cardSummaryStopWords = new Set([
+  "a", "an", "and", "at", "by", "for", "from", "in", "of", "on", "or", "the", "to", "with"
+]);
+
+async function validateDataProjects() {
+  const projects = await readContentFiles("data-projects", [".md", ".mdx"]);
+  for (const project of projects) {
+    if (!project.data.title) warn(`Data project "${project.file}" has no title; filename fallback will be used.`);
+    if (project.data.coverImage && !(await existsPublic(project.data.coverImage))) {
+      warn(`Data project "${project.file}" coverImage was not found: ${project.data.coverImage}`);
+    }
+  }
+}
+
+async function validateContentWork() {
+  const items = await readContentFiles("content-work", [".md", ".mdx"]);
+  for (const item of items) {
+    if (!item.data.title && !item.data.generatedTitle && !item.data.guidedContext) {
+      warn(`Content item "${item.file}" has no title, generatedTitle, or guidedContext; filename fallback will be used.`);
+    }
+    if (item.data.publishStatus && !["draft", "published", "archived"].includes(String(item.data.publishStatus))) {
+      warn(`Content item "${item.file}" has invalid publishStatus; it will render as published.`);
+    }
+    if (item.data.contentType && !allowedContentTypes.includes(String(item.data.contentType))) {
+      warn(`Content item "${item.file}" has invalid contentType; embed fallback will be used.`);
+    }
+    if (item.data.platform && !allowedContentPlatforms.includes(String(item.data.platform))) {
+      warn(`Content item "${item.file}" has invalid platform; instagram fallback will be used.`);
+    }
+    if (item.data.playback && !["embed", "local"].includes(item.data.playback)) {
+      fail(`Content item "${item.file}" has invalid playback; use embed or local.`);
+    }
+    if (item.data.playback === "local") {
+      if (!item.data.videoSrc?.startsWith("/videos/") || !(await existsPublic(item.data.videoSrc))) {
+        fail(`Content item "${item.file}" needs an existing local videoSrc under /videos/.`);
+      }
+      if (!item.data.coverImage || !(await existsPublic(item.data.coverImage))) {
+        fail(`Content item "${item.file}" needs an existing coverImage for local playback.`);
+      }
+      if (!item.data.externalUrl) fail(`Content item "${item.file}" needs an externalUrl to its original post.`);
+    }
+    const socialCategory = String(item.data.socialCategory || "");
+    if (socialCategory === "adult-education") {
+      warn(`Content item "${item.file}" uses legacy socialCategory "adult-education"; use "corporate" instead.`);
+    } else if (item.data.socialCategory && !allowedSocialCategories.includes(socialCategory)) {
+      warn(`Content item "${item.file}" has invalid socialCategory; lifestyle fallback will be used.`);
+    }
+    if (item.data.coverImage && !(await existsPublic(item.data.coverImage))) {
+      warn(`Content item "${item.file}" coverImage was not found: ${item.data.coverImage}`);
+    }
+  }
+}
+
+await validatePhotography();
+await validateDataProjects();
+await validateContentWork();
+
+for (const warning of warnings) console.warn(`Warning: ${warning}`);
+
+if (errors.length) {
+  console.error(`Content validation failed with ${errors.length} issue${errors.length === 1 ? "" : "s"}:`);
+  for (const error of errors) console.error(`- ${error}`);
+  process.exit(1);
+}
+
+console.log("Content validation passed.");

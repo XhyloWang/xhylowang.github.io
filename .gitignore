@@ -1,0 +1,14 @@
+node_modules/
+.npm-cache/
+.astro/
+dist/
+output/
+inbox/
+.env
+.env.*
+!.env.example
+.portfolio-auth/
+.DS_Store
+.claude/
+
+*.report.html

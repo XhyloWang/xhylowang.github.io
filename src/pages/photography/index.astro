@@ -1,0 +1,135 @@
+---
+import { getCollection } from "astro:content";
+import BaseLayout from "@layouts/BaseLayout.astro";
+import TestimonialsSection from "@components/TestimonialsSection.astro";
+import WhatToExpectSection from "@components/WhatToExpectSection.astro";
+import BookingProcess from "@components/BookingProcess.astro";
+import WorkGrid from "@components/WorkGrid.astro";
+import ProgressiveList from "@components/ProgressiveList.astro";
+import { photographyTypeName, published } from "@lib/content";
+import { entrySlug } from "@lib/content";
+import { getGalleryCover } from "@lib/gallery-images";
+import { rankPhotographyForAll, rankPhotographyForCategory } from "@lib/content";
+import { getBriefUrl } from "@lib/enquiries";
+import { pricing, site } from "@lib/site";
+
+const photographyRows = [
+  { label: "Half-day coverage", value: `From $${pricing.photography.halfDay.toLocaleString("en-SG")}.` },
+  { label: "Full-day coverage", value: `From $${pricing.photography.fullDay.toLocaleString("en-SG")}.` },
+  { label: "Your quote", value: "Pricing depends on the coverage duration and requirements. We’ll agree the hours and deliverables before booking." },
+  { label: "Photographs", value: "The number of edited photographs varies with the length and programme of the event. We’ll discuss the expected delivery when agreeing your coverage." },
+  { label: "Turnaround", value: "Event galleries are delivered within 3–5 business days. Delivery within 1 business day or on the same day may be available by arrangement. Let’s discuss what you need before booking." },
+  { label: "Booking ahead", value: "If you can, enquire at least 2 weeks ahead, especially for weekends and peak-season dates." },
+  { label: "Usage", value: "Images are yours to use for marketing, recaps, and future promotion." }
+];
+
+const photos = published(await getCollection("photography"));
+const allPhotos = rankPhotographyForAll(photos);
+const visibleCoverPhoto = allPhotos.find((photo) => !photo.data.hidden);
+const pageCover = visibleCoverPhoto
+  ? getGalleryCover(entrySlug(visibleCoverPhoto), visibleCoverPhoto.data.coverImage, visibleCoverPhoto.data.images, visibleCoverPhoto.data.coverImageIndex, "medium")
+  : "";
+const defaultPhotographyType = "all";
+const photographySections = [
+  {
+    id: "all",
+    label: "All",
+    items: allPhotos
+  },
+  {
+    id: "corporate-private-events",
+    label: photographyTypeName("corporate-private-events"),
+    items: rankPhotographyForCategory(photos.filter((photo) => photo.data.photographyType === "corporate-private-events"))
+  },
+  {
+    id: "stage-work",
+    label: photographyTypeName("stage-work"),
+    items: rankPhotographyForCategory(photos.filter((photo) => photo.data.photographyType === "stage-work"))
+  },
+  {
+    id: "photoshoot",
+    label: photographyTypeName("photoshoot"),
+    items: rankPhotographyForCategory(photos.filter((photo) => photo.data.photographyType === "photoshoot"))
+  },
+  {
+    id: "wedding-rom",
+    label: photographyTypeName("wedding-rom"),
+    items: rankPhotographyForCategory(photos.filter((photo) => photo.data.photographyType === "wedding-rom"))
+  }
+];
+---
+
+<BaseLayout title={`Photography | ${site.name}`} description="Event, portrait, and celebration photography in Singapore. View galleries and discuss coverage." active="photography" image={pageCover} fullTitle>
+  <section class="page-hero photography-page-hero" aria-labelledby="photography-title">
+    <p class="eyebrow">Photography</p>
+    <h1 id="photography-title">Events, celebrations, and portraits</h1>
+    <p>I photograph conferences, company gatherings, weddings, and private celebrations in Singapore.</p>
+    <p>You’ll also find portraits and creative shoots in the galleries below.</p>
+  </section>
+
+  <section class="gallery-index-section photography-browser" aria-label="Photography galleries">
+    <div class="curation-view-label" aria-hidden="true">Curation view</div>
+    <div class="photography-tabs" role="tablist" aria-label="Photography categories">
+      {
+        photographySections.map((section) => (
+          <button
+            class:list={["photography-tab", { "is-active": section.id === defaultPhotographyType }]}
+            type="button"
+            role="tab"
+            aria-selected={section.id === defaultPhotographyType ? "true" : "false"}
+            aria-controls={`photography-panel-${section.id}`}
+            id={`photography-tab-${section.id}`}
+            data-photography-tab={section.id}
+          >
+            {section.label}
+          </button>
+        ))
+      }
+    </div>
+    {
+      photographySections.map((section) => (
+        <section
+          class="photography-panel"
+          id={`photography-panel-${section.id}`}
+          role="tabpanel"
+          aria-labelledby={`photography-tab-${section.id}`}
+          data-photography-panel={section.id}
+          hidden={section.id !== defaultPhotographyType}
+        >
+          {section.items.length > 0 ? <ProgressiveList id={`photography-items-${section.id}`} initialCount={10}><WorkGrid items={section.items} /></ProgressiveList> : <p class="empty-gallery-note">No published galleries in this section yet.</p>}
+        </section>
+      ))
+    }
+  </section>
+
+  <TestimonialsSection />
+  <WhatToExpectSection id="what-to-expect" rows={photographyRows} heading="Pricing and delivery" />
+  <BookingProcess />
+
+  <script>
+    const tabs = Array.from(document.querySelectorAll<HTMLElement>("[data-photography-tab]"));
+    const panels = Array.from(document.querySelectorAll<HTMLElement>("[data-photography-panel]"));
+
+    function selectPhotographySection(id: string) {
+      tabs.forEach((tab) => {
+        const isActive = tab.dataset.photographyTab === id;
+        tab.classList.toggle("is-active", isActive);
+        tab.setAttribute("aria-selected", String(isActive));
+      });
+
+      panels.forEach((panel) => {
+        panel.hidden = panel.dataset.photographyPanel !== id;
+      });
+    }
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => selectPhotographySection(tab.dataset.photographyTab || "all"));
+    });
+  </script>
+
+  <section class="page-cta" aria-labelledby="photo-contact-title">
+    <h2 id="photo-contact-title">Got an event worth capturing well?</h2>
+    <p>Conferences, workshops, networking sessions, or a milestone that matters to you. I'd love to help you cover it.</p>
+    <a class="button button-dark" href={getBriefUrl("photography")}>Let's talk</a>
+  </section>
+</BaseLayout>

@@ -1,0 +1,63 @@
+---
+import { getWhatsAppUrl } from "@lib/enquiries";
+
+const service = Astro.url.pathname.startsWith("/photography") ? "photography"
+  : Astro.url.pathname.startsWith("/videography") ? "video" : undefined;
+const formUrl = service ? `/contact/?service=${service}` : "/contact/";
+---
+
+<button type="button" class="floating-contact-button" popovertarget="contact-options" aria-controls="contact-options">
+  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-6 4V6a2 2 0 0 1 2-2Z" />
+  </svg>
+  <span>Contact me</span>
+</button>
+
+<div id="contact-options" popover="auto" aria-labelledby="contact-options-title">
+  <div class="contact-options-heading">
+    <h2 id="contact-options-title">Let’s talk about your project</h2>
+    <button type="button" popovertarget="contact-options" popovertargetaction="hide" aria-label="Close contact options">×</button>
+  </div>
+  <p>Choose how you’d like to get in touch.</p>
+  <a class="contact-option" href={getWhatsAppUrl(service)} target="_blank" rel="noreferrer">
+    <strong>WhatsApp <span aria-hidden="true">↗</span></strong>
+    <span>Start a conversation with me.</span>
+  </a>
+  <a class="contact-option" href={formUrl}>
+    <strong>Contact form <span aria-hidden="true">→</span></strong>
+    <span>Share your plans and request a quote.</span>
+  </a>
+</div>
+
+<style>
+  .floating-contact-button { font-family: inherit; cursor: pointer; }
+  #contact-options {
+    position: fixed;
+    inset: auto clamp(24px, 3vw, 48px) calc(clamp(24px, 3vw, 42px) + 72px) auto;
+    margin: 0;
+    width: min(350px, calc(100vw - 36px));
+    max-height: calc(100dvh - 130px);
+    overflow-y: auto;
+    box-sizing: border-box;
+    padding: 22px;
+    border: 1px solid #9c978e;
+    border-radius: 16px;
+    background: var(--paper-bright, #fffdf7);
+    color: var(--ink, #211d19);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, .18);
+  }
+  .contact-options-heading { display: flex; align-items: start; gap: 12px; }
+  .contact-options-heading h2 { margin: 0; font: inherit; font-size: 1.2rem; font-weight: 750; line-height: 1.35; }
+  .contact-options-heading button { flex-shrink: 0; width: 44px; height: 44px; margin: -10px -10px 0 auto; border: 0; background: transparent; color: inherit; font-size: 1.6rem; cursor: pointer; }
+  #contact-options p { margin: 8px 0 18px; font-size: .95rem; line-height: 1.5; }
+  .contact-option { display: grid; gap: 6px; padding: 16px; border: 1px solid #9c978e; border-radius: 10px; text-decoration: none; }
+  .contact-option + .contact-option { margin-top: 10px; }
+  .contact-option strong { display: flex; justify-content: space-between; gap: 12px; }
+  .contact-option > span { font-size: .9rem; line-height: 1.5; }
+  .contact-option:hover { background: var(--paper, #f1ede4); }
+  #contact-options :is(a, button):focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+  @media (min-width: 621px) and (max-width: 810px) { #contact-options { right: 24px; bottom: 96px; } }
+  @media (max-width: 620px) {
+    #contact-options { right: calc(18px + env(safe-area-inset-right)); bottom: calc(84px + env(safe-area-inset-bottom)); max-height: calc(100dvh - 120px - env(safe-area-inset-bottom)); }
+  }
+</style>

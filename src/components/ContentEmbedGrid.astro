@@ -1,0 +1,180 @@
+---
+import type { ContentWorkEntry } from "@lib/content";
+import { displayTitle } from "@lib/content";
+import SocialMediaPlayer from "./SocialMediaPlayer.astro";
+import ProgressiveList from "./ProgressiveList.astro";
+import { render } from "astro:content";
+
+interface Props {
+  items: ContentWorkEntry[];
+}
+
+const { items } = Astro.props;
+const renderedItems = await Promise.all(
+  items.map(async (item) => ({
+    item,
+    title: displayTitle(item),
+    Body: (await render(item)).Content
+  }))
+);
+const categories = [
+  { id: "all", label: "All" },
+  { id: "corporate", label: "Corporate" },
+  { id: "lifestyle", label: "Lifestyle" },
+  { id: "real-estate", label: "Real estate" }
+] as const;
+const defaultCategory = "all";
+
+const platformLabels = {
+  instagram: "Instagram",
+  tiktok: "TikTok",
+  linkedin: "LinkedIn"
+};
+
+---
+
+<section class="content-showcase" aria-label="Social media examples" data-content-filter-root data-social-embeds>
+  <div class="content-tabs" role="tablist" aria-label="Social media categories">
+    {
+      categories.map((category) => (
+        <button
+          class:list={["content-tab", { "is-active": category.id === defaultCategory }]}
+          type="button"
+          role="tab"
+          aria-selected={category.id === defaultCategory ? "true" : "false"}
+          data-content-filter={category.id}
+        >
+          {category.label}
+        </button>
+      ))
+    }
+  </div>
+
+  {
+    items.length > 0 ? (
+      <ProgressiveList id="social-post-list" initialCount={4} increment={4}>
+      <div class="content-embed-grid">
+        {
+          renderedItems.map(({ item, title, Body }) => (
+            <article
+              class="content-embed-card"
+              data-content-card
+              data-category={item.data.socialCategory}
+              hidden={defaultCategory !== "all" && item.data.socialCategory !== defaultCategory}
+            >
+              <div class:list={["content-embed-window", {
+                "content-reel-frame": item.data.playback === "local" || (item.data.platform === "instagram" && !!item.data.embedHtml)
+              }]}>
+                <SocialMediaPlayer item={item} title={title} />
+              </div>
+              <div class="content-embed-text">
+                <h3>{title}</h3>
+                {
+                  item.data.metrics.length > 0 && (
+                    <div class="content-metrics" aria-label={`${title} metrics`}>
+                      {item.data.metrics.map((metric) => (
+                        <span>
+                          <strong>{metric.value}</strong>
+                          {metric.label}
+                        </span>
+                      ))}
+                    </div>
+                  )
+                }
+                <Body />
+                {
+                  item.data.externalUrl && (
+                    <a class="content-direct-link" href={item.data.externalUrl} target="_blank" rel="noreferrer">
+                      Open {platformLabels[item.data.platform]} post
+                    </a>
+                  )
+                }
+              </div>
+            </article>
+          ))
+        }
+      </div>
+      </ProgressiveList>
+    ) : (
+      <p class="empty-gallery-note">Add content examples in <code>src/content/content-work/</code>.</p>
+    )
+  }
+</section>
+
+<script>
+  const contentFilterRoot = document.querySelector("[data-content-filter-root]");
+  const contentFilterButtons = Array.from(document.querySelectorAll<HTMLElement>("[data-content-filter]"));
+
+  function selectContentFilter(category: string) {
+    contentFilterButtons.forEach((button) => {
+      const isActive = button.dataset.contentFilter === category;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-selected", String(isActive));
+    });
+
+    const grid = contentFilterRoot?.querySelector<HTMLElement>(".content-embed-grid");
+    if (grid) {
+      grid.dataset.progressiveFilter = category;
+      grid.dispatchEvent(new Event("progressive-filter-change", { bubbles: true }));
+    }
+  }
+
+  if (contentFilterRoot) {
+    const categoryFromUrl = new URLSearchParams(window.location.search).get("category") || window.location.hash.replace("#", "");
+    const validCategory = contentFilterButtons.some((button) => button.dataset.contentFilter === categoryFromUrl)
+      ? categoryFromUrl
+      : "all";
+    selectContentFilter(validCategory);
+
+    contentFilterButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const category = button.dataset.contentFilter || "all";
+        selectContentFilter(category);
+        const url = new URL(window.location.href);
+        url.searchParams.set("category", category);
+        history.replaceState(null, "", url);
+      });
+    });
+  }
+</script>
+
+<style>
+  /* Match the homepage's media viewport, independent of provider chrome,
+     loading, and category visibility. */
+  .content-reel-frame {
+    position: relative;
+    width: min(100%, 390px);
+    height: 480px;
+    min-height: 0;
+    margin-inline: auto;
+    overflow: hidden;
+    border-radius: 24px;
+    background: #111;
+  }
+  .content-reel-frame :global(.local-social-video) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+  }
+  .content-reel-frame :global(.native-embed) {
+    position: absolute;
+    inset: -1px;
+    min-height: 0;
+    display: block;
+  }
+  .content-reel-frame :global(.instagram-media) {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    transform: translateY(-118px) scale(1.18);
+    transform-origin: top center;
+  }
+  @media (max-width: 640px) {
+    .content-reel-frame :global(.instagram-media) {
+      transform: translateY(-96px) scale(1.14);
+    }
+  }
+</style>

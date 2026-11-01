@@ -1,0 +1,180 @@
+---
+interface Props {
+  html: string;
+  platform: string;
+  variant?: "home" | "content";
+}
+const { html, platform, variant = "content" } = Astro.props;
+---
+
+<div class={variant === "home" ? "home-social-embed" : "native-embed"} data-social-embed={platform}>
+  {platform === "instagram" ? (
+    <template><Fragment set:html={html} /></template>
+  ) : (
+    <Fragment set:html={html} />
+  )}
+</div>
+
+<script>
+  type EmbedWindow = Window & {
+    instgrm?: { Embeds: { process: () => void } };
+  };
+  const scripts = new Map<string, Promise<void>>();
+  function loadScript(src: string) {
+    if (!scripts.has(src)) {
+      const pending = new Promise<void>((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = src;
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = () => {
+          script.remove();
+          scripts.delete(src);
+          reject(new Error("Social embed unavailable"));
+        };
+        document.head.appendChild(script);
+      });
+      scripts.set(src, pending);
+    }
+    return scripts.get(src)!;
+  }
+
+  const pendingEmbeds = new WeakMap<HTMLElement, Promise<void>>();
+  function activate(root: HTMLElement): Promise<void> {
+    const pending = pendingEmbeds.get(root);
+    if (pending) return pending;
+    const task = renderEmbed(root);
+    pendingEmbeds.set(root, task);
+    return task;
+  }
+
+  async function renderEmbed(root: HTMLElement) {
+    // TikTok's script scans the document on startup. Preserve its existing
+    // rendering behaviour; Instagram supports processing newly inserted cards.
+    if (root.dataset.socialEmbed === "tiktok") {
+      await loadScript("https://www.tiktok.com/embed.js").catch(() => {});
+      return;
+    }
+    const template = root.querySelector("template");
+    if (!template || root.dataset.loading) return;
+    // Wait for the iframe, not just the provider script, before warming the
+    // next batch. A timeout keeps a blocked provider from stopping the queue.
+    let finish: () => void = () => {};
+    const frameLoaded = new Promise<void>((resolve) => {
+      const onLoad = (event: Event) => {
+        if (event.target instanceof HTMLIFrameElement) finish();
+      };
+      const timeout = setTimeout(() => finish(), 8000);
+      finish = () => {
+        clearTimeout(timeout);
+        root.removeEventListener("load", onLoad, true);
+        resolve();
+      };
+      root.addEventListener("load", onLoad, true);
+    });
+    root.dataset.loading = "true";
+    root.appendChild(template.content.cloneNode(true));
+    try {
+      await loadScript("https://www.instagram.com/embed.js");
+      (window as EmbedWindow).instgrm?.Embeds.process();
+      template.remove();
+      root.dataset.loaded = "true";
+      await frameLoaded;
+    } catch {
+      // Keep the original-post link usable if the provider is blocked/offline.
+      root.querySelectorAll(":scope > :not(template)").forEach((node) => node.remove());
+      pendingEmbeds.delete(root);
+    } finally {
+      finish();
+      delete root.dataset.loading;
+    }
+  }
+
+  const roots = document.querySelectorAll<HTMLElement>("[data-social-embed]");
+  const isDisplayed = (root: HTMLElement) => !root.closest("[hidden]") && !!root.getClientRects().length;
+  function prepareHiddenCard(root: HTMLElement) {
+    const card = root.closest<HTMLElement>("[data-content-card][hidden]");
+    if (!card) return;
+    const visibleWindow = Array.from(document.querySelectorAll<HTMLElement>("[data-content-card]:not([hidden]) .content-embed-window"))
+      .find((element) => element.getBoundingClientRect().width > 0);
+    card.style.setProperty("--embed-preload-width", `${visibleWindow?.getBoundingClientRect().width || 390}px`);
+    card.dataset.embedPreload = "";
+  }
+
+  // Prioritize displayed Instagram cards, then warm hidden content-page
+  // cards one at a time. Recheck priorities after filters or View more change.
+  let preloadPending = false;
+  const attempted = new WeakSet<HTMLElement>();
+  const preloadPreviews = () => {
+    if (preloadPending) return;
+    preloadPending = true;
+    const load = async () => {
+      try {
+        while (true) {
+          const candidates = Array.from(roots).filter((root) =>
+            root.dataset.socialEmbed === "instagram" && !attempted.has(root) &&
+            (isDisplayed(root) || root.closest("[data-content-filter-root]"))
+          );
+          if (!candidates.length) break;
+          const displayed = candidates.filter(isDisplayed);
+          const batch = displayed.length ? displayed : candidates.slice(0, 1);
+          batch.forEach((root) => {
+            attempted.add(root);
+            if (!isDisplayed(root)) prepareHiddenCard(root);
+          });
+          await Promise.all(batch.map(activate));
+        }
+      } finally {
+        preloadPending = false;
+      }
+    };
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(load, { timeout: 2000 });
+    } else {
+      setTimeout(load, 1000);
+    }
+  };
+  if (document.readyState === "complete") {
+    preloadPreviews();
+  } else {
+    window.addEventListener("load", preloadPreviews, { once: true });
+  }
+
+  const visibilityObserver = new MutationObserver(preloadPreviews);
+  document.querySelectorAll("[data-content-filter-root] [data-progressive-list]").forEach((root) =>
+    visibilityObserver.observe(root, { attributes: true, attributeFilter: ["hidden"], subtree: true })
+  );
+
+  if ("IntersectionObserver" in window) {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) void activate(entry.target as HTMLElement);
+      });
+    }, { rootMargin: "800px 0px" });
+    roots.forEach((root) => observer.observe(root));
+  } else {
+    // Older browsers still get embeds; hidden cards wait until revealed.
+    const reveal = () => roots.forEach((root) => {
+      if (root.getClientRects().length) void activate(root);
+    });
+    requestAnimationFrame(reveal);
+    const observer = new MutationObserver(reveal);
+    document.querySelectorAll("[data-progressive-list]").forEach((root) =>
+      observer.observe(root, { attributes: true, attributeFilter: ["hidden"], subtree: true })
+    );
+  }
+</script>
+
+<style>
+  /* Instagram needs a rendered width to fetch hidden preview images. Keep
+     these cards invisible and out of layout until the list reveals them. */
+  :global([data-content-filter-root] [data-progressive-list] [data-content-card][data-progressive-item][hidden][data-embed-preload]) {
+    display: block !important;
+    position: fixed;
+    top: 0;
+    left: -10000px;
+    width: var(--embed-preload-width);
+    visibility: hidden;
+    pointer-events: none;
+  }
+</style>
