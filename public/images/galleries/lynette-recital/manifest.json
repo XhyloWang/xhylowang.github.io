@@ -1,0 +1,226 @@
+{
+  "generatedAt": "2026-11-01T10:48:18.312Z",
+  "sourceFiles": [
+    {
+      "name": "DSC01501.jpg",
+      "mtimeMs": 1793527819902.9727,
+      "size": 14414311,
+      "outputThumb": "image-001-thumb.webp",
+      "outputLarge": "image-001-large.webp",
+      "width": 2550,
+      "height": 1700,
+      "aspectRatio": 1.5
+    },
+    {
+      "name": "DSC01565.jpg",
+      "mtimeMs": 1793527817324.496,
+      "size": 2771272,
+      "outputThumb": "image-002-thumb.webp",
+      "outputLarge": "image-002-large.webp",
+      "width": 1579,
+      "height": 2368,
+      "aspectRatio": 0.6668
+    },
+    {
+      "name": "DSC01733.jpg",
+      "mtimeMs": 1793527818041.829,
+      "size": 9635157,
+      "outputThumb": "image-003-thumb.webp",
+      "outputLarge": "image-003-large.webp",
+      "width": 2550,
+      "height": 1700,
+      "aspectRatio": 1.5
+    },
+    {
+      "name": "DSC01844.jpg",
+      "mtimeMs": 1793527817748.9556,
+      "size": 8293055,
+      "outputThumb": "image-004-thumb.webp",
+      "outputLarge": "image-004-large.webp",
+      "width": 2550,
+      "height": 1700,
+      "aspectRatio": 1.5
+    },
+    {
+      "name": "DSC01852.jpg",
+      "mtimeMs": 1793527817472.041,
+      "size": 8523575,
+      "outputThumb": "image-005-thumb.webp",
+      "outputLarge": "image-005-large.webp",
+      "width": 2550,
+      "height": 1700,
+      "aspectRatio": 1.5
+    },
+    {
+      "name": "JON05086.jpg",
+      "mtimeMs": 1793527818645.6108,
+      "size": 18826215,
+      "outputThumb": "image-006-thumb.webp",
+      "outputLarge": "image-006-large.webp",
+      "width": 2550,
+      "height": 1700,
+      "aspectRatio": 1.5,
+      "outputMedium": "image-006-medium.webp"
+    },
+    {
+      "name": "JON05113.jpg",
+      "mtimeMs": 1793527817879.2837,
+      "size": 8000501,
+      "outputThumb": "image-007-thumb.webp",
+      "outputLarge": "image-007-large.webp",
+      "width": 2550,
+      "height": 1700,
+      "aspectRatio": 1.5
+    },
+    {
+      "name": "JON05158.jpg",
+      "mtimeMs": 1793527819584.37,
+      "size": 12424948,
+      "outputThumb": "image-008-thumb.webp",
+      "outputLarge": "image-008-large.webp",
+      "width": 2550,
+      "height": 1700,
+      "aspectRatio": 1.5
+    },
+    {
+      "name": "JON05231.jpg",
+      "mtimeMs": 1793527819327.8254,
+      "size": 17124093,
+      "outputThumb": "image-009-thumb.webp",
+      "outputLarge": "image-009-large.webp",
+      "width": 2550,
+      "height": 1700,
+      "aspectRatio": 1.5
+    },
+    {
+      "name": "JON05309.jpg",
+      "mtimeMs": 1793527821012.2937,
+      "size": 27371258,
+      "outputThumb": "image-010-thumb.webp",
+      "outputLarge": "image-010-large.webp",
+      "width": 1700,
+      "height": 2550,
+      "aspectRatio": 0.6667
+    },
+    {
+      "name": "JON05683.jpg",
+      "mtimeMs": 1793527818176.4417,
+      "size": 8165825,
+      "outputThumb": "image-011-thumb.webp",
+      "outputLarge": "image-011-large.webp",
+      "width": 2550,
+      "height": 1700,
+      "aspectRatio": 1.5
+    },
+    {
+      "name": "JON05710.jpg",
+      "mtimeMs": 1793527818337.1057,
+      "size": 8100395,
+      "outputThumb": "image-012-thumb.webp",
+      "outputLarge": "image-012-large.webp",
+      "width": 2550,
+      "height": 1700,
+      "aspectRatio": 1.5
+    },
+    {
+      "name": "JON05807.jpg",
+      "mtimeMs": 1793527822045.042,
+      "size": 34383290,
+      "outputThumb": "image-013-thumb.webp",
+      "outputLarge": "image-013-large.webp",
+      "width": 2550,
+      "height": 1700,
+      "aspectRatio": 1.5
+    },
+    {
+      "name": "JON05842.jpg",
+      "mtimeMs": 1793527820188.3374,
+      "size": 13057108,
+      "outputThumb": "image-014-thumb.webp",
+      "outputLarge": "image-014-large.webp",
+      "width": 2550,
+      "height": 1700,
+      "aspectRatio": 1.5
+    },
+    {
+      "name": "JON06193.jpg",
+      "mtimeMs": 1793527821523.8867,
+      "size": 14108155,
+      "outputThumb": "image-015-thumb.webp",
+      "outputLarge": "image-015-large.webp",
+      "width": 2550,
+      "height": 1700,
+      "aspectRatio": 1.5
+    },
+    {
+      "name": "JON06260.jpg",
+      "mtimeMs": 1793527817613.415,
+      "size": 7842877,
+      "outputThumb": "image-016-thumb.webp",
+      "outputLarge": "image-016-large.webp",
+      "width": 2550,
+      "height": 1700,
+      "aspectRatio": 1.5
+    },
+    {
+      "name": "JON06479.jpg",
+      "mtimeMs": 1793527823262.963,
+      "size": 24172989,
+      "outputThumb": "image-017-thumb.webp",
+      "outputLarge": "image-017-large.webp",
+      "width": 2550,
+      "height": 1700,
+      "aspectRatio": 1.5
+    },
+    {
+      "name": "JON06482.jpg",
+      "mtimeMs": 1793527823683.8577,
+      "size": 25947409,
+      "outputThumb": "image-018-thumb.webp",
+      "outputLarge": "image-018-large.webp",
+      "width": 2550,
+      "height": 1700,
+      "aspectRatio": 1.5
+    },
+    {
+      "name": "JON06670.jpg",
+      "mtimeMs": 1793527821274.9363,
+      "size": 15367658,
+      "outputThumb": "image-019-thumb.webp",
+      "outputLarge": "image-019-large.webp",
+      "width": 2550,
+      "height": 1700,
+      "aspectRatio": 1.5
+    },
+    {
+      "name": "JON06849.jpg",
+      "mtimeMs": 1793527820461.6953,
+      "size": 16520217,
+      "outputThumb": "image-020-thumb.webp",
+      "outputLarge": "image-020-large.webp",
+      "width": 2550,
+      "height": 1700,
+      "aspectRatio": 1.5
+    },
+    {
+      "name": "JON06869.jpg",
+      "mtimeMs": 1793527822438.325,
+      "size": 22569273,
+      "outputThumb": "image-021-thumb.webp",
+      "outputLarge": "image-021-large.webp",
+      "width": 2550,
+      "height": 1700,
+      "aspectRatio": 1.5
+    },
+    {
+      "name": "JON06915.jpg",
+      "mtimeMs": 1793527819033.4688,
+      "size": 22290347,
+      "outputThumb": "image-022-thumb.webp",
+      "outputLarge": "image-022-large.webp",
+      "width": 2550,
+      "height": 1700,
+      "aspectRatio": 1.5
+    }
+  ]
+}
