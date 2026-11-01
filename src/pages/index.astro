@@ -22,28 +22,11 @@ const socialHighlights = contentItems.filter((item) => item.data.contentType ===
 const corporateCoverUrl = (photo: PhotographyEntry) =>
   getGalleryCover(entrySlug(photo), photo.data.coverImage, photo.data.images, photo.data.coverImageIndex, "medium");
 
-// Carousel landscape sources: cover images in a curated order (up to 5).
-// TODO(xinhang): replace with Xinhang’s gallery slugs, in carousel order.
-const landscapeCoverSlugs = [
-  "placeholder-corporate-event",
-  "placeholder-stage-performance",
-  "placeholder-studio-portrait",
-  "placeholder-wedding-celebration"
-];
-const corporateCovers = landscapeCoverSlugs
-  .map((slug) => {
-    const photo = photos.find((candidate) => entrySlug(candidate) === slug);
-    return photo ? corporateCoverUrl(photo) : "";
-  })
-  .filter(Boolean);
-
-// TODO(xinhang): replace with the two galleries that feed the portrait carousel.
-const portraitSourceSlugs = [
-  "placeholder-corporate-event",
-  "placeholder-studio-portrait"
-];
-const walkingTourSlug = "placeholder-wedding-celebration";
-const walkingTourEntry = photos.find((candidate) => entrySlug(candidate) === walkingTourSlug);
+const carouselEntries = allRankedPhotos.filter((photo) => !photo.data.hidden).slice(0, 4);
+const corporateCovers = carouselEntries.map((photo) => corporateCoverUrl(photo)).filter(Boolean);
+const portraitSourceSlugs = carouselEntries.slice(0, 2).map((photo) => entrySlug(photo));
+const walkingTourEntry = carouselEntries[2];
+const walkingTourSlug = walkingTourEntry ? entrySlug(walkingTourEntry) : "";
 
 const portraitsBySource = new Map<string, GalleryImage[]>();
 for (const slug of portraitSourceSlugs) {
@@ -93,9 +76,10 @@ const ogImage = carouselSlides[0]?.portrait || pageCover;
       <ul class="identity-list" aria-label="Short description">
         <li>Event photographer</li>
         <li>Event videographer</li>
+        <li>Social content creator</li>
       </ul>
       <div class="home-intro-block">
-        <p class="hero-lede">I’m a photographer and videographer based in Singapore, covering corporate events, private celebrations, and creative shoots.</p>
+        <p class="hero-lede">I’m a photographer and videographer based in Singapore, covering corporate events, private celebrations, and social content shoots.</p>
         <div class="hero-actions">
           <a class="button button-dark" href="#corporate-work">Explore my work</a>
           <a class="button button-accent" href="/contact/">Contact me</a>
@@ -170,7 +154,7 @@ const ogImage = carouselSlides[0]?.portrait || pageCover;
             <p>Event photography for conferences, corporate gatherings, and private celebrations. View selected coverage below.</p>
           </div>
         </div>
-        <WorkGrid items={homepageWorkItems} />
+        {homepageWorkItems.length > 0 ? <WorkGrid items={homepageWorkItems} /> : <p class="empty-gallery-note">No published galleries in this section yet.</p>}
         <div class="home-section-footer">
           <a class="button button-dark" href="/photography/">View all galleries</a>
         </div>
@@ -178,7 +162,7 @@ const ogImage = carouselSlides[0]?.portrait || pageCover;
     )
   }
 
-  {sections.video && (
+  {sections.videography && (
     <section id="event-video" class="home-section home-event-film" aria-labelledby="home-event-film-title">
       <EventFilmFeature {...featuredEventFilm} id="home-event-film-title" loading="lazy" exploreUrl="/videography/" />
     </section>

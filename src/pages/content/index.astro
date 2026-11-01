@@ -36,10 +36,10 @@ const pageCover = featuredCaseStudy?.data.coverImage || embedItems.find((item) =
   <section class="page-hero content-page-hero" aria-labelledby="content-title">
     <p class="eyebrow">Social media</p>
     <h1 id="content-title">Reels for businesses and creators</h1>
-    <p>Selected videos for Instagram and TikTok, including education, lifestyle, and property content.</p>
+    <p>Selected short-form videos for Instagram and TikTok.</p>
   </section>
 
-  <ContentEmbedGrid items={embedItems} />
+  {embedItems.length > 0 && <ContentEmbedGrid items={embedItems} />}
 
   {
     featuredCaseStudy && CaseStudyBody && (

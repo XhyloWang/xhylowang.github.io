@@ -5,7 +5,7 @@ import { getWhatsAppUrl } from "@lib/enquiries";
 import { site } from "@lib/site";
 ---
 
-<BaseLayout title="Contact" description={`Contact ${site.name} for photography and video enquiries.`} active="contact">
+<BaseLayout title="Contact" description={`Contact ${site.name} for event photography, event video, and social media content enquiries in Singapore.`} active="contact">
   <section class="contact-page" aria-labelledby="contact-title">
     <header class="contact-intro">
       <h1 id="contact-title">Let’s work together</h1>
@@ -22,7 +22,7 @@ import { site } from "@lib/site";
         <h2 id="enquiry-title">Send an enquiry</h2>
       </header>
       <form action="https://api.web3forms.com/submit" method="POST" id="enquiry-form">
-        <!-- TODO(xinhang): add the Web3Forms access key. Enquiries cannot send until it is set. -->
+        <!-- TODO: add the Web3Forms access key. Enquiries cannot send until it is set. -->
         <input type="hidden" name="access_key" value="" />
         <input type="hidden" name="subject" value="New portfolio project enquiry" />
         <input type="checkbox" name="botcheck" class="botcheck" tabindex="-1" aria-hidden="true" />
@@ -37,7 +37,7 @@ import { site } from "@lib/site";
           <select id="enquiry-service" name="service" required>
             <option value="" disabled selected>Select a service</option>
             <option value="photography">Photography</option>
-            {sections.video && <option value="video">Video</option>}
+            {sections.videography && <option value="video">Video</option>}
             <option value="photo-video">Photography + video</option>
             <option value="social">Social media content</option>
           </select>

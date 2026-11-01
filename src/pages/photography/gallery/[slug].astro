@@ -6,6 +6,7 @@ import JustifiedGallery from "@components/JustifiedGallery.astro";
 import WorkGrid from "@components/WorkGrid.astro";
 import { displayTitle, entrySlug, published, rankPhotographyForCategory, rankPhotographyForAll, splitHidden } from "@lib/content";
 import { getGalleryCover, getGalleryImages } from "@lib/gallery-images";
+import { site } from "@lib/site";
 
 export async function getStaticPaths() {
   const photos = published(await getCollection("photography"));
@@ -26,7 +27,7 @@ const heroCoverMedium = getGalleryCover(slug, item.data.coverImage, item.data.im
 const heroCoverLarge = coverImage;
 ---
 
-<BaseLayout title={`${title} / Photography`} description={item.data.summary || item.data.description || "A photography gallery."} active="photography" image={coverImage}>
+<BaseLayout title={`${title} / Photography`} description={item.data.summary || item.data.description || `A photography gallery from ${site.name}.`} active="photography" image={coverImage}>
   <section class="page-hero photography-page-hero gallery-hero" aria-labelledby="gallery-title">
     {
       coverImage && (
