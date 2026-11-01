@@ -33,9 +33,8 @@ npm run build
 ## Site settings
 
 1. Edit `src/lib/site.ts` to set the name, title, description, email, WhatsApp number, featured film, rates, and visible sections.
-2. Add the Web3Forms access key in `src/pages/contact.astro`. Enquiries cannot send until that key is set.
-3. Set the production URL in `astro.config.mjs`, or set the `SITE_URL` environment variable.
-4. Replace the images in `public/images/services/`.
+2. Set the production URL in `astro.config.mjs`, or set the `SITE_URL` environment variable.
+3. Replace the images in `public/images/services/`.
 
 The social media page and the data section stay in the code but are hidden by the `sections` switches in `src/lib/site.ts`. Set `content: true` after adding social posts, or `data: true` after adding projects.
 

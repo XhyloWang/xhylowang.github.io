@@ -1,9 +1,9 @@
 ---
 import { getWhatsAppUrl } from "@lib/enquiries";
+import { site } from "@lib/site";
 
 const service = Astro.url.pathname.startsWith("/photography") ? "photography"
   : Astro.url.pathname.startsWith("/videography") ? "video" : undefined;
-const formUrl = service ? `/contact/?service=${service}` : "/contact/";
 ---
 
 <button type="button" class="floating-contact-button" popovertarget="contact-options" aria-controls="contact-options">
@@ -23,9 +23,9 @@ const formUrl = service ? `/contact/?service=${service}` : "/contact/";
     <strong>WhatsApp <span aria-hidden="true">↗</span></strong>
     <span>Start a conversation with me.</span>
   </a>
-  <a class="contact-option" href={formUrl}>
-    <strong>Contact form <span aria-hidden="true">→</span></strong>
-    <span>Share your plans and request a quote.</span>
+  <a class="contact-option" href={`mailto:${site.email}`}>
+    <strong>Email <span aria-hidden="true">→</span></strong>
+    <span>{site.email}</span>
   </a>
 </div>
 
