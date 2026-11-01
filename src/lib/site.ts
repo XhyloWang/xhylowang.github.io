@@ -1,5 +1,4 @@
-// TODO(xinhang): replace every placeholder value in this file before publishing.
-const whatsappMessage = `Hi Xinhang, I’d like to enquire about a project.
+const whatsappMessage = `Hi Xhylo, I’d like to enquire about a project.
 
 Service needed:
 Date or timeframe:
@@ -9,37 +8,35 @@ Requirements:
 Could you let me know your availability?`;
 
 export const site = {
-  name: "Xinhang",
-  title: "Photography & Videography | Xinhang",
+  name: "Xhylo",
+  title: "Event Photography & Videography | Xhylo",
   description:
-    "Photography and videography for corporate events, private celebrations, and creative shoots in Singapore. Placeholder description for the new site.",
-  email: "hello@example.com",
-  whatsapp: "+65 0000 0000",
-  whatsappUrl: `https://api.whatsapp.com/send/?phone=6500000000&text=${encodeURIComponent(whatsappMessage)}&type=phone_number&app_absent=0`
+    "Corporate event photography and videography for businesses and brands in Singapore.",
+  email: "xhylowang@gmail.com",
+  whatsapp: "+65 9695 2283",
+  whatsappUrl: `https://wa.me/6596952283?text=${encodeURIComponent(whatsappMessage)}`
 };
 
-// TODO(xinhang): set videoId to Xinhang’s featured YouTube film. The play
-// control stays hidden while videoId is empty.
 export const featuredEventFilm = {
-  videoId: "",
-  posterUrl: "/images/placeholders/event-film-poster.webp",
-  linkedinUrl: "https://www.linkedin.com/",
-  label: "Featured event film",
-  title: "Placeholder film title.",
-  titleLineTwo: "Replace this copy.",
-  description: "Placeholder description for the featured event film."
+  videoId: "SndciZ1MDzE",
+  posterUrl: "/images/jeremy-monteiro-soul-mates.jpg",
+  linkedinUrl: "",
+  label: "Featured film",
+  title: "Jeremy Monteiro:",
+  titleLineTwo: "Soul Mates.",
+  description:
+    "A music film of Jeremy Monteiro’s Soul Mates, built around the performance and the interplay between the musicians."
 } as const;
 
-// TODO(xinhang): set Xinhang’s rates. These are placeholder figures.
 export const pricing = {
   photography: {
-    halfDay: 500,
-    fullDay: 1000
+    halfDay: 600,
+    fullDay: 1400
   },
   content: {
-    single: 300,
-    campaign: 750,
-    retainer: 1000
+    single: 350,
+    campaign: 875,
+    retainer: 1200
   }
 };
 
@@ -48,15 +45,15 @@ export const pricing = {
 // visited directly (soft-hide), so no routing changes are needed.
 export const sections = {
   photography: true,
-  video: true,
-  content: false, // Social media page is built and hidden until Xinhang has real posts.
+  videography: true,
+  content: false, // Social media page is built and hidden until Xhylo has real posts.
   caseStudy: false, // Reserved toggle for a featured case study inside /content/.
   data: false
 } satisfies Record<string, boolean>;
 
 const allNavItems = [
   { id: "photography", href: "/photography/", label: "Photography" },
-  { id: "video", href: "/videography/", label: "Event video" },
+  { id: "videography", href: "/videography/", label: "Videography" },
   { id: "content", href: "/content/", label: "Social media" },
   { id: "data", href: "/data/", label: "Data" },
   { id: "contact", href: "/contact/", label: "Contact" }

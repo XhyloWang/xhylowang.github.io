@@ -2,16 +2,15 @@
 
 A static portfolio site for photography and videography. It uses [Astro](https://astro.build) 5, stores content as Markdown and MDX, and deploys to GitHub Pages.
 
-The code comes from an earlier portfolio site that used the same Astro setup. All content is placeholder material, so the site builds and can be restyled before real work is added.
+The code comes from an earlier portfolio site that used the same Astro setup. Site copy lives in the master copy document and in `src/lib/site.ts`. Galleries are intentionally empty until source photos are imported.
 
-## What is placeholder
+## Content status
 
-- Four galleries in `src/content/photography/`, all named `placeholder-*`, with generated images in `public/images/placeholders/`.
-- Two sample posts in `src/content/content-work/`.
-- Three sample testimonials in `src/content/testimonials/`.
-- Generated service card images in `public/images/services/`.
-- A featured film with no video ID, so the video page shows its poster without playback.
-- Contact details, site copy, and rates in `src/lib/site.ts`.
+- `src/content/photography/` is empty; add galleries with the importer below.
+- `src/content/content-work/` and `src/content/data-projects/` are empty. Their pages stay in the code but are hidden by the `sections` switches.
+- Testimonials in `src/content/testimonials/` are lorem ipsum until real client quotes are available.
+- The featured film is Jeremy Monteiro: Soul Mates on YouTube, using a local poster in `public/images/`.
+- Service card images, contact details, and rates are set.
 
 ## Getting started
 
@@ -31,14 +30,14 @@ npm run build
 
 `npm run build` imports galleries, generates optional copy, validates content, and writes the production site to `dist/`.
 
-## Replace the placeholder details
+## Site settings
 
 1. Edit `src/lib/site.ts` to set the name, title, description, email, WhatsApp number, featured film, rates, and visible sections.
-2. Add Xinhang’s Web3Forms access key in `src/pages/contact.astro`. Enquiries cannot send until that key is set.
+2. Add the Web3Forms access key in `src/pages/contact.astro`. Enquiries cannot send until that key is set.
 3. Set the production URL in `astro.config.mjs`, or set the `SITE_URL` environment variable.
-4. Replace the images in `public/images/services/` and the placeholder galleries.
+4. Replace the images in `public/images/services/`.
 
-The social media page and the data section stay in the code but are hidden by the `sections` switches in `src/lib/site.ts`. Set `content: true` to show the social media page after adding real posts.
+The social media page and the data section stay in the code but are hidden by the `sections` switches in `src/lib/site.ts`. Set `content: true` after adding social posts, or `data: true` after adding projects.
 
 To enable AI copy generation, copy `.env.example` to `.env` and add `OPENAI_API_KEY`. Without a key, the build skips generation.
 
@@ -49,8 +48,6 @@ To enable AI copy generation, copy `.env.example` to `.env` and add `OPENAI_API_
 3. Run `npm run import:magic`, or run `npm run build`.
 
 The importer writes optimized WebP files and a manifest to `public/images/galleries/<slug>/`, and creates `src/content/photography/<slug>.md`. Commit the generated output and keep `inbox/` local.
-
-Delete the placeholder galleries once real galleries exist.
 
 ## Add social work
 

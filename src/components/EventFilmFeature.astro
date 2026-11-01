@@ -59,12 +59,16 @@ const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&r
     }
   </div>
 
-  <div class="event-film-footer">
-    <a class="button event-film-link" href={linkedinUrl} target="_blank" rel="noreferrer">
-      View LinkedIn post
-    </a>
-    {exploreUrl && <a class="button event-film-link" href={exploreUrl}>Explore event video</a>}
-  </div>
+  {(linkedinUrl || exploreUrl) && (
+    <div class="event-film-footer">
+      {linkedinUrl && (
+        <a class="button event-film-link" href={linkedinUrl} target="_blank" rel="noreferrer">
+          View LinkedIn post
+        </a>
+      )}
+      {exploreUrl && <a class="button event-film-link" href={exploreUrl}>Explore event video</a>}
+    </div>
+  )}
 </article>
 
 <script is:inline>

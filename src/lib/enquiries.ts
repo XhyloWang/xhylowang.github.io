@@ -12,7 +12,7 @@ export const getWhatsAppUrl = (service?: EnquiryService): string => {
 
   const phone = site.whatsapp.replace(/\D/g, "");
   const text = encodeURIComponent(serviceMessages[service]);
-  return `https://api.whatsapp.com/send/?phone=${phone}&text=${text}&type=phone_number&app_absent=0`;
+  return `https://wa.me/${phone}?text=${text}`;
 };
 
 export const getBriefUrl = (service?: EnquiryService): string =>
